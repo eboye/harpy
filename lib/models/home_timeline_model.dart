@@ -12,17 +12,19 @@ class HomeTimelineModel extends TimelineModel {
   static final Logger _log = Logger("HomeTimelineModel");
 
   @override
-  Future<List<Tweet>> getCachedTweets() {
-    return timelineDatabase.findHomeTimelineTweets();
-  }
+  Future<List<Tweet>> getCachedTweets() =>
+      timelineDatabase.findHomeTimelineTweets();
 
   @override
-  Future<void> updateTweets() async {
+  Future<void> updateTweets({
+    Duration timeout,
+    bool silentError = true,
+  }) async {
     _log.fine("updating tweets");
 
     final List<Tweet> updatedTweets = await tweetService
-        .getHomeTimeline()
-        .catchError(twitterClientErrorHandler);
+        .getHomeTimeline(timeout: timeout)
+        .catchError(silentError ? (_) {} : twitterClientErrorHandler);
 
     if (updatedTweets != null) {
       tweets = updatedTweets;
@@ -43,29 +45,15 @@ class HomeTimelineModel extends TimelineModel {
   }
 
   @override
-  Future<void> requestMore() async {
-    await super.requestMore();
-
-    final id = "${tweets.last.id - 1}";
-
-    final List<Tweet> newTweets = await tweetService
-        .getHomeTimeline(maxId: id)
-        .catchError(twitterClientErrorHandler);
-
-    if (newTweets != null) {
-      // todo: maybe add new tweets to cached home timeline ids
-      addNewTweets(newTweets);
-    }
-
-    requestingMore = false;
-    notifyListeners();
-  }
+  Future<List<Tweet>> requestMoreTweets() => tweetService
+      .getHomeTimeline(maxId: "${tweets.last.id - 1}")
+      .catchError(twitterClientErrorHandler);
 
   void updateTweet(Tweet tweet) {
     final int index = tweets.indexOf(tweet);
     if (index != -1) {
       _log.fine("updating home timeline tweet");
-      tweets[index] = tweet;
+      tweets[index].harpyData = tweet.harpyData;
     }
     notifyListeners();
   }

@@ -22,36 +22,46 @@ class CustomThemeScreen extends StatelessWidget {
   final HarpyThemeData editingThemeData;
   final int editingThemeId;
 
+  /// Resets the system ui color when returning from the custom theme.
+  Future<bool> _onWillPop(BuildContext context) async {
+    ThemeSettingsModel.of(context).updateSystemUi();
+
+    return true;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider<CustomThemeModel>(
-      builder: (_) => CustomThemeModel(
-        themeSettingsModel: ThemeSettingsModel.of(context),
-        editingThemeData: editingThemeData,
-        editingThemeId: editingThemeId,
-      ),
-      child: Consumer<CustomThemeModel>(
-        builder: (context, customThemeModel, _) => Theme(
-          data: customThemeModel.harpyTheme.theme,
-          child: HarpyScaffold(
-            backgroundColors: customThemeModel.harpyTheme.backgroundColors,
-            title: "Custom theme",
-            actions: <Widget>[
-              _CustomThemeSaveButton(),
-            ],
-            body: Column(
-              children: <Widget>[
-                Expanded(
-                  child: ListView(
-                    children: <Widget>[
-                      _CustomThemeNameField(customThemeModel),
-                      const SizedBox(height: 8),
-                      _CustomThemeColorSelections(),
-                    ],
-                  ),
-                ),
-                if (customThemeModel.editingTheme) _CustomThemeDeleteButton(),
+    return WillPopScope(
+      onWillPop: () => _onWillPop(context),
+      child: ChangeNotifierProvider<CustomThemeModel>(
+        builder: (_) => CustomThemeModel(
+          themeSettingsModel: ThemeSettingsModel.of(context),
+          editingThemeData: editingThemeData,
+          editingThemeId: editingThemeId,
+        ),
+        child: Consumer<CustomThemeModel>(
+          builder: (context, customThemeModel, _) => Theme(
+            data: customThemeModel.harpyTheme.theme,
+            child: HarpyScaffold(
+              backgroundColors: customThemeModel.harpyTheme.backgroundColors,
+              title: "Custom theme",
+              actions: <Widget>[
+                _CustomThemeSaveButton(),
               ],
+              body: Column(
+                children: <Widget>[
+                  Expanded(
+                    child: ListView(
+                      children: <Widget>[
+                        _CustomThemeNameField(customThemeModel),
+                        const SizedBox(height: 8),
+                        _CustomThemeColorSelections(),
+                      ],
+                    ),
+                  ),
+                  if (customThemeModel.editingTheme) _CustomThemeDeleteButton(),
+                ],
+              ),
             ),
           ),
         ),
@@ -64,46 +74,48 @@ class CustomThemeScreen extends StatelessWidget {
 ///
 /// Only appears when editing an existing custom theme.
 class _CustomThemeDeleteButton extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
+  void _showDialog(BuildContext context) {
     final customThemeModel = CustomThemeModel.of(context);
     final themeSettingsModel = ThemeSettingsModel.of(context);
 
+    showDialog(
+        context: context,
+        builder: (context) {
+          return HarpyDialog(
+            title: "Really delete?",
+            actions: [
+              DialogAction.discard,
+              DialogAction.confirm,
+            ],
+          );
+        }).then((result) {
+      if (result == true) {
+        if (themeSettingsModel.selectedThemeId ==
+            customThemeModel.editingThemeId) {
+          // when deleting the active custom theme, reset to the
+          // default theme
+          themeSettingsModel.changeSelectedTheme(
+            PredefinedThemes.themes.first,
+            0,
+          );
+        }
+
+        themeSettingsModel.deleteCustomTheme(
+          themeSettingsModel.selectedThemeId,
+        );
+
+        Navigator.of(context).pop();
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8),
-      child: RaisedHarpyButton(
+      child: HarpyButton.raised(
         text: "Delete theme",
-        onTap: () {
-          showDialog(
-              context: context,
-              builder: (context) {
-                return HarpyDialog(
-                  title: "Really delete?",
-                  actions: [
-                    DialogAction.discard,
-                    DialogAction.confirm,
-                  ],
-                );
-              }).then((result) {
-            if (result == true) {
-              if (themeSettingsModel.selectedThemeId ==
-                  customThemeModel.editingThemeId) {
-                // when deleting the active custom theme, reset to the
-                // default theme
-                themeSettingsModel.changeSelectedTheme(
-                  PredefinedThemes.themes.first,
-                  0,
-                );
-              }
-
-              themeSettingsModel.deleteCustomTheme(
-                themeSettingsModel.selectedThemeId,
-              );
-
-              Navigator.of(context).pop();
-            }
-          });
-        },
+        onTap: () => _showDialog(context),
       ),
     );
   }

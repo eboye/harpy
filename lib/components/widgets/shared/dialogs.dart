@@ -146,14 +146,14 @@ class DialogAction<T> extends StatelessWidget {
     final Function callback = onTap ?? () => Navigator.of(context).pop(result);
 
     if (text != null) {
-      return NewFlatHarpyButton(
+      return HarpyButton.flat(
         text: text,
         onTap: callback,
         dense: true,
       );
     } else if (icon != null) {
-      return IconHarpyButton(
-        iconData: icon,
+      return HarpyButton.flat(
+        icon: icon,
         onTap: callback,
         dense: true,
       );

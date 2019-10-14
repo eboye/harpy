@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:harpy/components/widgets/shared/loading_tile.dart';
 import 'package:harpy/components/widgets/tweet/tweet_list.dart';
 import 'package:harpy/models/timeline_model.dart';
 import 'package:provider/provider.dart';
@@ -22,51 +23,18 @@ class _TweetTimelineState<T extends TimelineModel>
 
   TimelineModel _timelineModel;
 
-  /// Listens to the [ScrollController] and calls [TimelineModel.requestMore]
-  /// when the bottom of the list has been reached.
-  void _scrollListener() {
-    if (_timelineModel != null) {
-      // if the list is scrolled to the bottom request more
-      if (!_timelineModel.requestingMore &&
-          _scrollController.position.extentAfter < 150.0) {
-        _timelineModel.requestMore();
-      }
-    }
-  }
-
   /// Builds a placeholder widget when no tweets exist or when currently loading
   /// tweets.
   Widget _buildPlaceholder() {
-    if (_timelineModel.tweets.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.all(32),
+    if (_timelineModel.loadingInitialTweets) {
+      return const LoadingTweetTile();
+    } else {
+      return const Padding(
+        padding: EdgeInsets.all(32),
         child: Center(
-          child: _timelineModel.loadingInitialTweets
-              ? const CircularProgressIndicator()
-              : const Text("No tweets exist"),
+          child: Text("No tweets found"),
         ),
       );
-    } else {
-      return null;
-    }
-  }
-
-  /// Builds a widget at the end of the list for loading more tweets.
-  Widget _buildsTrailing() {
-    if (_timelineModel.requestingMore) {
-      return SizedBox(
-        height: 100,
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            const Text("Loading more tweets..."),
-            const SizedBox(height: 16),
-            const CircularProgressIndicator(),
-          ],
-        ),
-      );
-    } else {
-      return null;
     }
   }
 
@@ -86,8 +54,7 @@ class _TweetTimelineState<T extends TimelineModel>
 
     final ScrollController inherited = PrimaryScrollController.of(context);
 
-    _scrollController = (inherited ?? ScrollController())
-      ..addListener(_scrollListener);
+    _scrollController = inherited ?? ScrollController();
 
     // dispose the controller if it hasn't been inherited
     // it gets inherited by the FadingNestedScaffold in the user profile
@@ -114,9 +81,10 @@ class _TweetTimelineState<T extends TimelineModel>
           child: TweetList(
             tweets: model.tweets,
             scrollController: _scrollController,
+            onLoadMore: _timelineModel.requestMore,
+            enableLoadMore: _timelineModel.enableRequestingMore,
             leading: widget.leading,
             placeHolder: _buildPlaceholder(),
-            trailing: _buildsTrailing(),
           ),
         );
       },

@@ -4,13 +4,10 @@ import 'package:logs/logs.dart';
 void initLogger({String prefix}) {
   Logger.root.level = Level.ALL;
 
-  // show network traffic logs in the dev tools' logging view
+  // show network traffic logs in the dev tools logging view
   Log('http').enabled = true;
 
   Logger.root.onRecord.listen((rec) {
-    // ignore sembast logger
-    if (rec.loggerName == "Sembast") return;
-
     final color = _AnsiColor.fromLogLevel(rec.level);
 
     final separator = _colored("  ::  ", color);

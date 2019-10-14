@@ -1,3 +1,5 @@
+import 'dart:collection';
+
 import 'package:flutter/cupertino.dart';
 import 'package:harpy/api/twitter/data/tweet.dart';
 import 'package:harpy/api/twitter/service_utils.dart';
@@ -21,85 +23,92 @@ abstract class TimelineModel extends ChangeNotifier {
   static final Logger _log = Logger("TimelineModel");
 
   /// The [tweets] for this timeline.
-  List<Tweet> tweets = [];
+  List<Tweet> get tweets => UnmodifiableListView(_tweets);
+  List<Tweet> _tweets = [];
+  @protected
+  set tweets(List<Tweet> tweets) => _tweets = tweets;
 
   /// `true` while loading [tweets].
   bool loadingInitialTweets = false;
 
-  /// `true` while requesting more tweets from the timeline (when scrolling to
-  /// the bottom of the tweet list).
-  bool requestingMore = false;
+  /// Whether or not more tweets should be able to be requested when
+  /// reaching the end of the list.
+  bool get enableRequestingMore => _tweets.isNotEmpty && !_blockRequestingMore;
 
   /// Called when tweets are updated in the [HomeTimelineModel].
   VoidCallback onTweetsUpdated;
 
   /// Returns `true` if [lastRequestedMore] has been set to less than 90
   /// seconds from [DateTime.now].
-  bool get blockRequestingMore {
-    if (lastRequestedMore == null) {
-      return false;
-    }
-    return DateTime.now().difference(lastRequestedMore).inSeconds < 90;
-  }
+  bool get _blockRequestingMore => lastRequestedMore == null
+      ? false
+      : DateTime.now().difference(lastRequestedMore).inSeconds < 90;
 
-  /// The last time [requestingMore] was called.
+  /// The last time [requestMore] was called.
   DateTime lastRequestedMore;
 
+  /// Initializes the [tweets] with cached tweets and updates the [tweets]
+  /// afterwards.
   Future<void> initTweets() async {
     _log.fine("initializing tweets");
     loadingInitialTweets = true;
+    notifyListeners();
 
-    // initialize with cached tweets
-    final List<Tweet> cachedTweets = await getCachedTweets() ?? [];
+    await updateTweets(timeout: const Duration(seconds: 5), silentError: true);
 
-    if (cachedTweets.isEmpty) {
-      // if no cached tweet exists wait for the initial api call
-      _log.fine("no cached tweets exist");
-      await updateTweets();
-    } else {
-      // if cached tweets exist update tweets but dont wait for it
-      _log.fine("got cached tweets");
-      tweets = sortTweetReplies(cachedTweets);
-      loadingInitialTweets = false;
-      updateTweets();
+    if (_tweets.isEmpty) {
+      _log.fine("unable to initialize tweets, getting cached tweets");
+      final List<Tweet> cachedTweets = await getCachedTweets() ?? [];
+
+      if (cachedTweets.isNotEmpty) {
+        _tweets = sortTweetReplies(cachedTweets);
+      }
     }
+
+    loadingInitialTweets = false;
+    notifyListeners();
   }
 
-  /// Overridden by implementations to get the cached tweets for the timeline.
+  /// Gets a list of cached [Tweet]s for the timeline or an empty list if no
+  /// cached tweets exists for the timeline.
   Future<List<Tweet>> getCachedTweets();
 
-  /// Overridden by implementations to update the list of [tweets].
-  Future<void> updateTweets();
+  /// Updates the [tweets] to the newest tweets for the timeline.
+  ///
+  /// If [silentError] is `true`, any exception during the request (for
+  /// example a timeout) won't be shown.
+  /// This is used when initially loading the [_tweets] with a low [timeout].
+  Future<void> updateTweets({Duration timeout, bool silentError});
 
+  /// Returns new tweets for the timeline.
+  ///
+  /// They are the tweets that come after the current [tweets].
+  /// [tweets] must not be empty when calling this.
+  Future<List<Tweet>> requestMoreTweets();
+
+  /// Used to request more [Tweet]s for the timeline when reaching the end of
+  /// the list.
   Future<void> requestMore() async {
     _log.fine("requesting more");
 
-    if (tweets.isEmpty) {
-      _log.warning("tweets empty, not requesting more");
-      return;
-    } else if (requestingMore) {
-      _log.warning("tried to request more while already requesting");
-      return;
-    } else if (blockRequestingMore) {
-      _log.warning("tried to request more while its still blocked");
-      notifyListeners();
-      return;
+    final List<Tweet> newTweets = await requestMoreTweets();
+
+    if (newTweets != null) {
+      _addNewTweets(newTweets);
     }
 
-    requestingMore = true;
-    notifyListeners();
-
     lastRequestedMore = DateTime.now();
+    notifyListeners();
   }
 
   /// Adds all [newTweets] to the list of [tweets] if they aren't already in
   /// the list.
-  void addNewTweets(List<Tweet> newTweets) {
+  void _addNewTweets(List<Tweet> newTweets) {
     // filter tweets that are already in the tweets list
     final List<Tweet> filteredTweets =
-        newTweets.where((tweet) => !tweets.contains(tweet)).toList();
+        newTweets.where((tweet) => !_tweets.contains(tweet)).toList();
 
-    tweets.addAll(sortTweetReplies(filteredTweets));
+    _tweets.addAll(sortTweetReplies(filteredTweets));
   }
 
   /// Finds the authors for the [tweet] replies by looking through the
@@ -107,12 +116,14 @@ abstract class TimelineModel extends ChangeNotifier {
   ///
   /// If no replies are found or if the only replies are from the parent
   /// author, `null` is returned instead.
+  // todo: maybe do this once in an isolate when retrieving the tweets and
+  //  save the reply authors in the harpyData for the parent tweets
   String findTweetReplyAuthors(Tweet tweet) {
     if (tweet.harpyData.parentOfReply != true) {
       return null;
     }
 
-    final List<Tweet> replies = tweets
+    final List<Tweet> replies = _tweets
         .where((child) => child.inReplyToStatusIdStr == tweet.idStr)
         .toList();
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
+import 'package:harpy/components/widgets/shared/flare_icons.dart';
 import 'package:harpy/components/widgets/shared/harpy_background.dart';
 import 'package:harpy/core/misc/harpy_theme.dart';
 
@@ -7,16 +8,20 @@ import 'package:harpy/core/misc/harpy_theme.dart';
 class HarpyScaffold extends StatelessWidget {
   HarpyScaffold({
     @required this.title,
+    this.showIcon = false,
     this.actions,
     this.drawer,
     this.body,
     this.backgroundColors,
+    this.appBarBottom,
   });
 
   final String title;
+  final bool showIcon;
   final List<Widget> actions;
   final Widget drawer;
   final Widget body;
+  final PreferredSizeWidget appBarBottom;
 
   /// When set the [HarpyBackground] will override the active theme background
   /// colors.
@@ -24,15 +29,27 @@ class HarpyScaffold extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final titleWidget = Row(
+      mainAxisSize: MainAxisSize.min,
+      children: <Widget>[
+        Text(
+          title,
+          style: Theme.of(context).textTheme.title,
+        ),
+        if (showIcon) ...[
+          const SizedBox(width: 4),
+          const FlareIcon.harpyLogo(size: 24),
+        ],
+      ],
+    );
+
     final AppBar appBar = AppBar(
       centerTitle: true,
       backgroundColor: Colors.transparent,
       elevation: 0,
       actions: actions,
-      title: Text(
-        title,
-        style: Theme.of(context).textTheme.title,
-      ),
+      title: titleWidget,
+      bottom: appBarBottom,
     );
 
     final double topPadding = MediaQuery.of(context).padding.top;

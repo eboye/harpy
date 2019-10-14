@@ -4,16 +4,20 @@ import 'package:flutter/services.dart';
 import 'package:harpy/components/widgets/media/media_player.dart';
 import 'package:harpy/components/widgets/shared/animations.dart';
 import 'package:harpy/components/widgets/shared/buttons.dart';
+import 'package:harpy/components/widgets/shared/implicit_animations.dart';
 import 'package:harpy/models/media_model.dart';
 import 'package:video_player/video_player.dart';
 
 /// The display icon size for the media video player and overlay.
 const double kMediaIconSize = 64;
 
+/// The [Color] of the icons used by the media overlay.
+const Color kMediaIconColor = Colors.white;
+
 /// The [VideoPlayer] for twitter videos.
 ///
-/// A [MediaVideoOverlay] is built on the [VideoPlayer] to allow for controlling
-/// the [VideoPlayer].
+/// A [MediaVideoOverlay] is built on the [VideoPlayer] that controls the
+/// [VideoPlayer].
 ///
 /// The size of the [MediaVideoPlayer] should be constrained.
 class MediaVideoPlayer extends StatefulWidget {
@@ -150,6 +154,8 @@ class _MediaVideoOverlayState extends State<MediaVideoOverlay>
     with
         MediaOverlayMixin<MediaVideoOverlay>,
         TickerProviderStateMixin<MediaVideoOverlay> {
+  final Color _iconColor = Colors.white;
+
   /// Handles the visibility of the overlay.
   AnimationController _visibilityController;
 
@@ -163,8 +169,9 @@ class _MediaVideoOverlayState extends State<MediaVideoOverlay>
   /// Whether or not the video volume is 0.
   bool _muted = false;
 
-  /// The widget in the center when the play state changes.
-  Widget _playPauseWidget = Container();
+  /// The play / pause icon in the center of the overlay that fades out when
+  /// the play state changes.
+  Widget _playPauseIcon;
 
   @override
   void initState() {
@@ -218,11 +225,12 @@ class _MediaVideoOverlayState extends State<MediaVideoOverlay>
   }
 
   void _togglePlay() {
-    _playPauseWidget = FadeOutWidget(
+    _playPauseIcon = FadeOutWidget(
       child: CircleButton(
         child: Icon(
           playing ? Icons.pause : Icons.play_arrow,
           size: kMediaIconSize,
+          color: _iconColor,
         ),
       ),
     );
@@ -274,25 +282,23 @@ class _MediaVideoOverlayState extends State<MediaVideoOverlay>
 
   /// Builds the widget in the center of the overlay.
   Widget _buildCenterIcon() {
-    if (buffering) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (!_overlayShowing) {
-      return Container();
-    }
-
-    Widget centerWidget;
-
     if (finished) {
-      centerWidget = const Icon(Icons.replay, size: kMediaIconSize);
+      return const Center(
+        child: Icon(
+          Icons.replay,
+          size: kMediaIconSize,
+          color: kMediaIconColor,
+        ),
+      );
+    } else if (!_overlayShowing) {
+      return Container();
+    } else if (buffering) {
+      return const Center(child: CircularProgressIndicator());
     } else if (_reshowingOverlay) {
-      centerWidget = Container();
+      return Container();
     } else {
-      centerWidget = _playPauseWidget;
+      return Center(child: _playPauseIcon);
     }
-
-    return Center(child: centerWidget);
   }
 
   /// Builds the bottom controls of the overlay.
@@ -311,22 +317,34 @@ class _MediaVideoOverlayState extends State<MediaVideoOverlay>
               // play / pause button
               CircleButton(
                 onPressed: _togglePlay,
-                child: Icon(playing ? Icons.pause : Icons.play_arrow),
+                child: ImplicitlyAnimatedIcon(
+                  icon: AnimatedIcons.play_pause,
+                  color: kMediaIconColor,
+                  animatedIconState: playing
+                      ? AnimatedIconState.showSecond
+                      : AnimatedIconState.showFirst,
+                ),
               ),
 
               Spacer(),
 
               CircleButton(
                 onPressed: _toggleMute,
-                child: Icon(_muted ? Icons.volume_up : Icons.volume_off),
+                child: Icon(
+                  _muted ? Icons.volume_off : Icons.volume_up,
+                  color: kMediaIconColor,
+                ),
               ),
 
               // fullscreen button
               CircleButton(
                 onPressed: _onFullscreenTap,
-                child: Icon(widget.videoPlayer.fullscreen
-                    ? Icons.fullscreen_exit
-                    : Icons.fullscreen),
+                child: Icon(
+                  widget.videoPlayer.fullscreen
+                      ? Icons.fullscreen_exit
+                      : Icons.fullscreen,
+                  color: kMediaIconColor,
+                ),
               ),
             ],
           ),
@@ -349,11 +367,13 @@ class _MediaVideoOverlayState extends State<MediaVideoOverlay>
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: _onVideoTap,
-      child: Stack(children: <Widget>[
-        widget.child,
-        _buildBottomRow(),
-        _buildCenterIcon(),
-      ]),
+      child: Stack(
+        children: <Widget>[
+          widget.child,
+          _buildBottomRow(),
+          _buildCenterIcon(),
+        ],
+      ),
     );
   }
 }

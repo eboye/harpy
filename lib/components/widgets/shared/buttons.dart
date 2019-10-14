@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:harpy/components/widgets/shared/animations.dart';
-import 'package:harpy/core/misc/harpy_theme.dart';
+import 'package:harpy/components/widgets/shared/implicit_animations.dart';
 
 /// Used by [FlatHarpyButton] to build a different icon when the button is
 /// highlighted.
@@ -196,24 +195,27 @@ class CircleButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ClipOval(
-      child: Material(
-        color: backgroundColor,
-        child: InkWell(
-          highlightColor: highlightColor,
-          splashColor: splashColor,
-          onTap: onPressed,
-          child: Padding(
-            padding: padding,
-            child: child,
-          ),
+    return Material(
+      type: MaterialType.circle,
+      color: backgroundColor,
+      child: InkWell(
+        highlightColor: highlightColor,
+        splashColor: splashColor,
+        onTap: onPressed,
+        customBorder: CircleBorder(),
+        child: Padding(
+          padding: padding,
+          child: child,
         ),
       ),
     );
   }
 }
 
-/// The base of the harpy button used by the raised and flat harpy button.
+/// The base for the [HarpyButton].
+///
+/// Uses [AnimatedScale] to have the button appear pressed down while it is
+/// tapped.
 class _HarpyButtonBase extends StatefulWidget {
   const _HarpyButtonBase({
     @required this.child,
@@ -253,130 +255,145 @@ class _HarpyButtonBaseState extends State<_HarpyButtonBase> {
   }
 }
 
-/// A raised button with a background.
-class RaisedHarpyButton extends StatelessWidget {
-  const RaisedHarpyButton({
-    @required this.text,
+/// A custom button with a rounded border that uses an [AnimatedScale] to
+/// appear pressed down on tap.
+///
+/// The [HarpyButton.raised] builds a button with elevation and a
+/// [backgroundColor].
+///
+/// The [HarpyButton.flat] builds a flat button and a transparent
+/// [backgroundColor].
+///
+/// The button can have an [icon] and [text]. When both are not `null`, the
+/// icon is built to the left of the text with a padding in between that is
+/// half of its vertical padding.
+///
+/// Either [icon] or [text] must not be `null`.
+class HarpyButton extends StatelessWidget {
+  /// A button that appears raised with a shadow.
+  ///
+  /// Uses the [ThemeData.buttonColor] as the [backgroundColor] by default.
+  const HarpyButton.raised({
     @required this.onTap,
-    this.dense = false,
+    this.text,
+    this.icon,
     this.backgroundColor,
-  });
+    this.dense = false,
+    this.padding,
+  })  : elevation = 8,
+        assert(text != null || icon != null);
 
+  /// A flat button that has a transparent background and no shadow.
+  ///
+  /// Should only be used when the context makes it clear it can be tapped.
+  const HarpyButton.flat({
+    @required this.onTap,
+    this.text,
+    this.icon,
+    this.dense = false,
+    this.padding,
+  })  : backgroundColor = Colors.transparent,
+        elevation = 0,
+        assert(text != null || icon != null);
+
+  /// The [text] of the button.
+  ///
+  /// Can be `null` if the button has no text.
   final String text;
+
+  /// The [icon] of the button.
+  ///
+  /// Can be `null` if the button has no icon.
+  final IconData icon;
+
+  /// The callback when the button is tapped.
+  ///
+  /// If `null`, the button is slightly transparent to appear disabled.
   final VoidCallback onTap;
-  final bool dense;
+
+  /// The color of the button.
+  ///
+  /// Uses the [ThemeData.buttonColor] if `null`.
   final Color backgroundColor;
+
+  /// Whether or not the button should have less padding.
+  ///
+  /// Has no effect if [padding] is not `null`.
+  final bool dense;
+
+  /// The padding for the button.
+  ///
+  /// Should usually be `null` to use the default padding that is controlled
+  /// with [dense] if a smaller padding is required.
+  final EdgeInsets padding;
+
+  /// The [elevation] that changes when using a [HarpyButton.flat] or
+  /// [HarpyButton.raised].
+  final double elevation;
+
+  EdgeInsets get _padding =>
+      padding ??
+      EdgeInsets.symmetric(
+        vertical: dense ? 8 : 12,
+        horizontal: dense ? 16 : 32,
+      );
+
+  /// Builds the row with the [Icon] and [Text] widget.
+  Widget _buildContent(ThemeData theme) {
+    Widget iconWidget;
+    Widget textWidget;
+
+    if (text != null) {
+      final style = backgroundColor != null
+          ? theme.textTheme.button.copyWith(color: theme.textTheme.body1.color)
+          : theme.textTheme.button;
+
+      // make sure the text overflow is handled when the button size is
+      // constrained, for example during an AnimatedCrossFade transition
+      textWidget = Text(
+        text,
+        style: style,
+        overflow: TextOverflow.fade,
+        softWrap: false,
+      );
+    }
+
+    if (icon != null) {
+      iconWidget = Icon(icon);
+    }
+
+    return IntrinsicWidth(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          if (iconWidget != null) iconWidget,
+          if (iconWidget != null && textWidget != null)
+            SizedBox(width: _padding.vertical / 4),
+          if (textWidget != null) Expanded(child: textWidget),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    final borderRadius = BorderRadius.circular(64);
-    final padding = EdgeInsets.symmetric(
-      vertical: dense ? 8 : 12,
-      horizontal: dense ? 16 : 32,
-    );
-
     final theme = Theme.of(context);
+    final borderRadius = BorderRadius.circular(64);
 
     Color color = backgroundColor ?? theme.buttonColor;
     if (onTap == null) {
       color = color.withOpacity(0.7);
     }
 
-    final style = backgroundColor != null
-        ? theme.textTheme.button.copyWith(color: theme.textTheme.body1.color)
-        : theme.textTheme.button;
-
     return _HarpyButtonBase(
       onTap: onTap,
       child: Material(
         color: color,
-        elevation: 8,
+        elevation: elevation,
         borderRadius: borderRadius,
         child: Padding(
-          padding: padding,
-          child: Text(text, style: style),
-        ),
-      ),
-    );
-  }
-}
-
-/// A flat button without a background that appears as text.
-///
-/// Should only be used when the context makes it clear it can be tapped.
-class NewFlatHarpyButton extends StatelessWidget {
-  const NewFlatHarpyButton({
-    @required this.text,
-    @required this.onTap,
-    this.dense = false,
-  });
-
-  final String text;
-  final VoidCallback onTap;
-
-  final bool dense;
-
-  @override
-  Widget build(BuildContext context) {
-    final borderRadius = BorderRadius.circular(64);
-    final padding = EdgeInsets.symmetric(
-      vertical: dense ? 8 : 12,
-      horizontal: dense ? 16 : 32,
-    );
-
-    final theme = Theme.of(context);
-
-    return _HarpyButtonBase(
-      onTap: onTap,
-      child: Container(
-        padding: padding,
-        decoration: BoxDecoration(
-          borderRadius: borderRadius,
-        ),
-        child: Text(
-          text,
-          style: theme.textTheme.button.copyWith(
-            color: theme.textTheme.body1.color,
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// A flat button with an icon in its center.
-class IconHarpyButton extends StatelessWidget {
-  const IconHarpyButton({
-    @required this.iconData,
-    @required this.onTap,
-    this.dense = false,
-  });
-
-  final IconData iconData;
-  final VoidCallback onTap;
-
-  final bool dense;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = HarpyTheme.of(context).theme;
-
-    final color = theme.textTheme.body1.color;
-    final borderRadius = BorderRadius.circular(64);
-    final padding = EdgeInsets.symmetric(
-      vertical: dense ? 8 : 12,
-      horizontal: dense ? 16 : 32,
-    );
-
-    return _HarpyButtonBase(
-      onTap: onTap,
-      child: Container(
-        decoration: BoxDecoration(
-          borderRadius: borderRadius,
-        ),
-        child: Padding(
-          padding: padding,
-          child: Icon(iconData, color: color),
+          padding: _padding,
+          child: _buildContent(theme),
         ),
       ),
     );

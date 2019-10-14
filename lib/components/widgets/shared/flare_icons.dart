@@ -1,4 +1,5 @@
 import 'package:flare_flutter/flare_actor.dart';
+import 'package:flare_flutter/flare_cache.dart';
 import 'package:flutter/material.dart';
 import 'package:harpy/components/widgets/shared/dialogs.dart';
 import 'package:harpy/components/widgets/shared/flare_buttons.dart';
@@ -37,6 +38,18 @@ class FlareIcon extends StatelessWidget {
           animation: "shining",
         );
 
+  const FlareIcon.harpyLogo({
+    double size = 18,
+    bool animate = false,
+    Offset offset = Offset.zero,
+  }) : this(
+          fileName: "$_path/harpy_logo.flr",
+          size: size,
+          sizeDifference: 14,
+          offset: offset,
+          animation: animate ? "show" : null,
+        );
+
   static const String _path = "assets/flare";
 
   /// The path of the flare asset file.
@@ -60,6 +73,14 @@ class FlareIcon extends StatelessWidget {
   final Color color;
 
   double get _calculatedSize => size + sizeDifference;
+
+  /// Loads the icons and adds them into the cache to make sure a widget
+  /// using a [FlareIcon] doesn't appear blank for a few frames when it
+  /// builds for the first time.
+  static void cacheIcons(BuildContext context) {
+    cachedActor(DefaultAssetBundle.of(context), "$_path/favorite.flr");
+    cachedActor(DefaultAssetBundle.of(context), "$_path/shining_star.flr");
+  }
 
   @override
   Widget build(BuildContext context) {

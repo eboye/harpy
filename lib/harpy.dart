@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:get_it/get_it.dart';
 import 'package:harpy/components/screens/entry_screen.dart';
-import 'package:harpy/core/misc/harpy_catcher.dart';
+import 'package:harpy/core/misc/harpy_error_handler.dart';
 import 'package:harpy/core/misc/harpy_navigator.dart';
 import 'package:harpy/core/misc/harpy_theme.dart';
 import 'package:harpy/core/misc/service_setup.dart';
@@ -10,7 +10,7 @@ import 'package:harpy/models/settings/settings_models_provider.dart';
 
 /// [GetIt] is a simple service locator for accessing services from anywhere
 /// in the app.
-final GetIt app = GetIt();
+final GetIt app = GetIt.instance;
 
 /// Runs the app with the given [flavor].
 ///
@@ -22,9 +22,9 @@ void runHarpy(Flavor flavor) {
 
   setupServices();
 
-  // HarpyCatcher will run the app and handle any uncaught exceptions
-  HarpyCatcher(
-    SettingsModelsProvider(
+  // HarpyErrorHandler will run the app and handle uncaught errors
+  HarpyErrorHandler(
+    child: SettingsModelsProvider(
       child: GlobalModelsProvider(
         child: Harpy(),
       ),

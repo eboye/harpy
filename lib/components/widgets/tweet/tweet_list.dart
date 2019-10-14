@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:harpy/api/twitter/data/tweet.dart';
+import 'package:harpy/components/widgets/shared/load_more_list.dart';
+import 'package:harpy/components/widgets/shared/scroll_direction_listener.dart';
+import 'package:harpy/components/widgets/shared/scroll_to_start.dart';
 import 'package:harpy/components/widgets/tweet/tweet_tile.dart';
 
 /// Builds a [ListView] for a list of tweets.
@@ -8,17 +11,17 @@ import 'package:harpy/components/widgets/tweet/tweet_tile.dart';
 ///
 /// [leading] will be built at the start of the list.
 /// [placeHolder] will be built instead of [tweets] if [tweets] is empty.
-/// [trailing] will be built at the end of the list.
 class TweetList extends StatelessWidget {
   TweetList({
     @required List<Tweet> tweets,
     this.scrollController,
+    this.onLoadMore,
+    this.enableLoadMore = false,
     Widget leading,
     Widget placeHolder,
-    Widget trailing,
   }) {
     if (leading != null) {
-      _content.add(leading);
+      _content..add(leading)..add(const Divider(height: 0));
     }
 
     if (tweets.isEmpty) {
@@ -28,17 +31,23 @@ class TweetList extends StatelessWidget {
     } else {
       _content.addAll(tweets);
     }
-
-    if (trailing != null) {
-      _content.add(trailing);
-    }
   }
 
   /// The [ScrollController] for the [TweetList].
   final ScrollController scrollController;
 
   /// The full content of the list.
+  ///
+  /// Can be of type [Widget] or [Tweet].
   final List<dynamic> _content = [];
+
+  /// Used by the [LoadMoreList] to load more tweets when reaching the end of
+  /// the list.
+  final OnLoadMore onLoadMore;
+
+  /// Whether or not more tweets should be requested when reaching the end of
+  /// the list.
+  final bool enableLoadMore;
 
   /// Builds an item in the list.
   ///
@@ -46,16 +55,15 @@ class TweetList extends StatelessWidget {
   Widget _itemBuilder(BuildContext context, int index) {
     final item = _content[index];
 
-    return item is Tweet
-        ? TweetTile(
-            key: ValueKey<int>(item.id),
-            tweet: item,
-          )
-        : item;
+    if (item is Tweet) {
+      return TweetTile(
+        key: ValueKey<int>(item.id),
+        tweet: item,
+      );
+    } else {
+      return item;
+    }
   }
-
-  // todo: maybe make tweetlist stateful and override didUpdateWidget to animate
-  //  the new list content and scroll to the top
 
   @override
   Widget build(BuildContext context) {
@@ -66,10 +74,19 @@ class TweetList extends StatelessWidget {
       itemCount: childCount,
     );
 
-    return ListView.custom(
-      controller: scrollController,
-      padding: EdgeInsets.zero,
-      childrenDelegate: childrenDelegate,
+    return ScrollDirectionListener(
+      child: ScrollToStart(
+        child: LoadMoreList(
+          onLoadMore: onLoadMore,
+          enable: enableLoadMore,
+          loadingText: "Loading more Tweets...",
+          child: ListView.custom(
+            controller: scrollController,
+            padding: EdgeInsets.zero,
+            childrenDelegate: childrenDelegate,
+          ),
+        ),
+      ),
     );
   }
 }
